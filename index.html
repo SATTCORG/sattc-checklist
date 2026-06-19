@@ -863,12 +863,21 @@ function renderRefDocs() {
     <div class="ref-grid">`;
   
   for (const doc of refDocs) {
-    html += `
+    if (doc.url) {
+      html += `
       <a href="${escapeHtml(doc.url)}" target="_blank" class="ref-card">
         <div class="crew-name">${escapeHtml(doc.crew)}</div>
         <div class="crew-leader">Crew leader: ${escapeHtml(doc.leader)}</div>
         <div class="crew-doc">${escapeHtml(doc.title)} →</div>
       </a>`;
+    } else {
+      html += `
+      <div class="ref-card" style="cursor:default">
+        <div class="crew-name">${escapeHtml(doc.crew)}</div>
+        <div class="crew-leader">Crew leader: ${escapeHtml(doc.leader)}</div>
+        <div class="crew-doc">${escapeHtml(doc.title)}</div>
+      </div>`;
+    }
   }
   
   html += `</div>`;
