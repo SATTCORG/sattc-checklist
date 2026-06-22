@@ -350,6 +350,7 @@ header img {
 .badge-oneoff { background: #fce4ec; color: #b71c1c; }
 .badge-overdue { background: #fdecea; color: var(--danger); font-weight: 700; }
 .badge-completed { background: #e8f5e9; color: var(--success); }
+.badge-building { background: #e3f2fd; color: #1565c0; }
 .due-date { font-size: 12px; color: var(--text-light); font-weight: 500; }
 
 /* ── Notes ────────────────────────────────────────────── */
@@ -515,7 +516,7 @@ header img {
 
 <!-- ═══ Footer ═══ -->
 <div class="footer-note">
-  The Stress &amp; Trauma Treatment Center &bull; Production Checklist
+  The Stress &amp; Trauma Treatment Center &bull; Work Checklist
 </div>
 
 </div><!-- /app-content -->
@@ -525,10 +526,9 @@ header img {
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const GATE_PASSWORD = '1200';
+const GATE_PASSWORD = 'Test';
 
 // After deploying the Apps Script Web App, paste its URL here:
-// PRODUCTION: This URL comes from deploying sattc-web-app.gs in Matt's sheet
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx4PeC1G4U_R0bOLh2IpEaIXc_qdVZpvnY5S11ha9rI3huqX9ybc7UyFmHYL33eQ_nU/exec';
 
 // ── Sample Fallback Data ────────────────────────────────────────────────────
@@ -625,7 +625,7 @@ async function loadTasks() {
   if (WEB_APP_URL) {
     showStatus('loading', 'Loading tasks...');
     try {
-      const res = await fetch(WEB_APP_URL);
+      const res = await fetch(WEB_APP_URL + '?t=' + Date.now());
       const data = await res.json();
       if (data.success) {
         tasks = data.tasks;
@@ -665,7 +665,6 @@ async function markComplete(taskId, buttonEl, cardEl) {
 
   buttonEl.disabled = true;
   buttonEl.textContent = '✓';
-  
   // Update local state & UI instantly (optimistic)
   const task = tasks.find(t => t.id === taskId);
   if (task) {
@@ -682,12 +681,21 @@ async function markComplete(taskId, buttonEl, cardEl) {
   // Save to server in the background
   if (WEB_APP_URL) {
     const url = WEB_APP_URL + '?action=complete&taskId=' + encodeURIComponent(taskId) + '&crewName=' + encodeURIComponent(name);
-    fetch(url, { redirect: 'follow' })
-      .then(r => r.text())
-      .then(t => JSON.parse(t))
+    fetch(url)
+      .then(r => r.json())
       .then(d => { if (!d.success) throw new Error(d.error); })
       .catch(e => {
-        console.warn('Server save failed, local state preserved:', e);
+        // Revert optimistic UI — the task is NOT actually done
+        showToast('⚠️ Save failed — tap ✓ to retry');
+        if (task) {
+          task.lastDone = '';
+          task.completedBy = '';
+          task.isOverdue = true;
+        }
+        cardEl.classList.remove('completed');
+        cardEl.classList.add('overdue');
+        buttonEl.disabled = false;
+        buttonEl.textContent = '✓';
       });
   }
 }
@@ -824,6 +832,11 @@ function renderTaskCard(task) {
   
   let metaHtml = `<span class="badge ${cadenceClass}">${task.cadence || 'One-off'}</span>`;
   
+  // Show subcategory if present (e.g. "Building 1")
+  if (task.subcategory) {
+    metaHtml += ` <span class="badge badge-building">🏢 ${task.subcategory}</span>`;
+  }
+  
   // Show due date for incomplete tasks
   if (task.nextDue && !isDone) {
     const dueLabel = task.isOverdue ? 'Was due' : 'Due';
@@ -863,21 +876,12 @@ function renderRefDocs() {
     <div class="ref-grid">`;
   
   for (const doc of refDocs) {
-    if (doc.url) {
-      html += `
+    html += `
       <a href="${escapeHtml(doc.url)}" target="_blank" class="ref-card">
         <div class="crew-name">${escapeHtml(doc.crew)}</div>
         <div class="crew-leader">Crew leader: ${escapeHtml(doc.leader)}</div>
         <div class="crew-doc">${escapeHtml(doc.title)} →</div>
       </a>`;
-    } else {
-      html += `
-      <div class="ref-card" style="cursor:default">
-        <div class="crew-name">${escapeHtml(doc.crew)}</div>
-        <div class="crew-leader">Crew leader: ${escapeHtml(doc.leader)}</div>
-        <div class="crew-doc">${escapeHtml(doc.title)}</div>
-      </div>`;
-    }
   }
   
   html += `</div>`;
